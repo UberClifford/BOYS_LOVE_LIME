@@ -3,7 +3,7 @@ Functions for explaining classifiers that use Image data.
 """
 import copy
 from functools import partial
-
+import sys
 import numpy as np
 import sklearn
 from sklearn.utils import check_random_state
@@ -127,7 +127,7 @@ class LimeImageExplainer(object):
                          hide_color=None,
                          top_labels=5, num_features=100000, num_samples=1000,
                          batch_size=10,
-                         segmentation_fn=None,
+                         segmentation_fn='quickshift',
                          distance_metric='cosine',
                          model_regressor=None,
                          random_seed=None,
@@ -173,10 +173,24 @@ class LimeImageExplainer(object):
         if random_seed is None:
             random_seed = self.random_state.randint(0, high=1000)
 
-        if segmentation_fn is None:
-            segmentation_fn = SegmentationAlgorithm('quickshift', kernel_size=4,
+        ###Added stuff: Added options for segmentation algorithms###
+        if segmentation_fn == 'quickshift':
+            segmentation_fn = SegmentationAlgorithm(segmentation_fn, kernel_size=4,
                                                     max_dist=200, ratio=0.2,
                                                     random_seed=random_seed)
+        elif segmentation_fn == 'felzenszwalb':
+            segmentation_fn = SegmentationAlgorithm(segmentation_fn, scale=100, sigma=0.5,
+                                                    min_size=50, random_seed=random_seed)
+        
+        elif segmentation_fn == 'slic':
+            segmentation_fn = SegmentationAlgorithm(segmentation_fn, n_segments=250,
+                                                    compactness=10, sigma=1, start_label=1, random_seed=random_seed)
+            
+        else:
+            sys.exit(f"Unknown segmentation algorithm: {segmentation_fn}")
+       
+        ### ###
+        
         try:
             segments = segmentation_fn(image)
         except ValueError as e:
