@@ -9,9 +9,8 @@ import sklearn
 from sklearn.utils import check_random_state
 from skimage.color import gray2rgb
 from tqdm.auto import tqdm
-import lime_base
-from scikit_image_wrapper import SegmentationAlgorithm
-
+from . import lime_base
+from .scikit_image_wrapper import SegmentationAlgorithm
 
 class ImageExplanation(object):
     def __init__(self, image, segments):
