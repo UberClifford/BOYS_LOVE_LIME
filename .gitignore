@@ -1,3 +1,5 @@
-data/*
+data/cat_vs_dogs/train/*.jpg
+data/cat_vs_dogs/test/*.jpg
+data/cat_vs_dogs/sampleSubmission.csv
 .ipynb_checkpoints
 __pycache__/
