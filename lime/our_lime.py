@@ -32,7 +32,7 @@ class ImageObject():
 ### SEGMENTATION ###
 class SegmentationMethod():
 
-    def __init__(self, method):
+    def __init__(self, method="quickshift", custom_fn=None):
         """
         Set segmentation method to skimage.segmentation method
         """
@@ -43,6 +43,8 @@ class SegmentationMethod():
             self.segmentation_method = felzenszwalb
         elif self.method == "slic":
             self.segmentation_method = slic
+        if custom_fn:
+            self.segmentation_method = custom_fn
                 
     def segment(self, img, **kwargs):
         """
