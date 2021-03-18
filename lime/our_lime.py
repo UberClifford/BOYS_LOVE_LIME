@@ -67,9 +67,9 @@ class Explainer():
 ### SEGMENTATION ###
 class SegmentationMethod():
 
-    def __init__(self, method="quickshift", custom_method=None):
+    def __init__(self, method="quickshift"):
         """
-        Set segmentation method to skimage.segmentation method
+        Set image segmentation method as a predefined algorithm or custom function
         """
         self.method = method        
         if self.method == "quickshift":
@@ -78,11 +78,13 @@ class SegmentationMethod():
             self.segmentation_method = felzenszwalb
         elif self.method == "slic":
             self.segmentation_method = slic
-        if custom_method:
-            self.segmentation_method = custom_method
+        elif isinstance(method, str):
+            raise KeyError(f"Unknown segmentation algorithm: {method}")
+        else:
+            self.segmentation_method = method
                 
     def __call__(self, img, **kwargs):
         """
-        Run skimage segmentation algorithm
+        Run segmentation method on image
         """
         return self.segmentation_method(img, **kwargs)
