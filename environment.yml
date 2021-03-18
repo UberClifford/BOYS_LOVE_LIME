@@ -1,0 +1,15 @@
+channels:
+  - pytorch
+dependencies:
+  - python
+  - numpy
+  - scipy
+  - matplotlib
+  - jupyter
+  - Pillow
+  - pytorch
+  - torchvision
+  - scikit-learn
+  - scikit-image
+  - tqdm
+  - requests
