@@ -186,7 +186,7 @@ class LimeImageExplainer(object):
             segmentation_fn = SegmentationAlgorithm(segmentation_fn, n_segments=250,
                                                     compactness=10, sigma=1, start_label=1, random_seed=random_seed)
             
-        else:
+        elif isinstance(segmentation_fn, str):
             sys.exit(f"Unknown segmentation algorithm: {segmentation_fn}")
        
         ### ###
