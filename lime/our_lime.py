@@ -1,6 +1,8 @@
 ### IMPORTS ###
-from pathlib import Path
+import numpy as np
 import matplotlib.pyplot as plt
+
+from pathlib import Path
 from PIL import Image
 from skimage.segmentation import felzenszwalb, slic, quickshift
 import numpy as np 
@@ -30,15 +32,15 @@ class ImageObject():
 ### EXPLAINER ###
 class Explainer():
 
-    def __init__(self, segmentation_method):
+    def __init__(self, segmentation_method, num_samples=1000):
         self.segmentation_method = segmentation_method
+        self.num_samples = num_samples
     
     def segment_image(self, image, **kwargs):
         """
         image: ImageObject
         """
-        image.superpixels = self.segmentation_method(image.original_image, **kwargs)
-        
+        image.superpixels = self.segmentation_method(image.original_image, **kwargs)        
         
     def mask_image(self, image, mask_value = None):
         """
@@ -64,6 +66,24 @@ class Explainer():
         
         image.masked_image = masked_img 
 
+    def sample_superpixels(self, image, num_samples):
+        # sample num_samples collections of superpixels
+        num_superpixels = np.unique(image.superpixels).size
+        superpixel_samples = np.random.randint(2, size=(num_samples, num_superpixels))
+
+        # apply samlpes to fudged image to generate pertubed images
+        sampled_images = list()
+        for sample in superpixel_samples:
+            sample_masked_image = image.original_image.copy()
+            turned_on_superpixels = np.where(sample == 1)[0]
+            mask = np.zeros(image.superpixels.shape).astype(bool)
+            for superpixel in turned_on_superpixels:  # turn on the sampled pixels
+                mask[img.superpixels == superpixel] = True
+            sample_masked_image[mask] = image.masked_image[mask]
+            sampled_images.append(sample_masked_image)
+        return sampled_images
+    
+        
 ### SEGMENTATION ###
 class SegmentationMethod():
 
