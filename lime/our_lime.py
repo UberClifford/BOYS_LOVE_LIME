@@ -1,11 +1,12 @@
 ### IMPORTS ###
 import numpy as np
 import matplotlib.pyplot as plt
-
 from pathlib import Path
 from PIL import Image
 from skimage.segmentation import felzenszwalb, slic, quickshift
 import numpy as np 
+import torch
+import torch.nn.functional as F
 
 ### IMAGE ### 
 class ImageObject():
@@ -82,6 +83,33 @@ class Explainer():
             sample_masked_image[mask] = image.masked_image[mask]
             sampled_images.append(sample_masked_image)
         return sampled_images
+    
+    def map_blaxbox_io(self, sampled_images, loaded_model, preprocess_function = None):    
+        """
+        Inputs:
+            sampled_images: Image samples resulting from different superpixel combinations.
+                            List of numpy arrays (rows, col, 3). 
+            loaded_model: Blackbox classifier with loaded weights.
+            preprocess_function: Preprocess function that transforms data to be the same as during
+                                 blackbox classifier training. If no normalization was used, don't 
+                                 use this option.
+        Outputs:
+            blackbox_io: List of tuples. Each tuple -> (sample_image, blackbox_out)
+        """
+        blackbox_out = list()
+        loaded_model.eval()
+        if preprocess_function == None:
+            preprocess_function = transforms.Compose([transforms.ToTensor()])
+    
+        for sample_image in sampled_images:
+            sample_image = torch.unsqueeze(preprocess_function(sample_image), dim=0)
+            out = loaded_model(sample_image)
+            softmax_out = F.softmax(out, dim = 1)
+            labels = torch.squeeze(softmax_out.detach(), dim = 0).numpy()
+            blackbox_out.append(labels)
+        blackbox_io = list(zip(sampled_images, blackbox_out))
+
+        return blackbox_io
     
         
 ### SEGMENTATION ###
