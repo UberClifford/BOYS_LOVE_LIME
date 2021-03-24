@@ -78,7 +78,7 @@ class Explainer():
             turned_on_superpixels = np.where(sample == 1)[0]
             mask = np.zeros(image.superpixels.shape).astype(bool)
             for superpixel in turned_on_superpixels:  # turn on the sampled pixels
-                mask[img.superpixels == superpixel] = True
+                mask[image.superpixels == superpixel] = True
             sample_masked_image[mask] = image.masked_image[mask]
             sampled_images.append(sample_masked_image)
         return sampled_images
