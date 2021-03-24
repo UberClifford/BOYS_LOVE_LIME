@@ -52,7 +52,7 @@ class Explainer():
         """
         
         img = image.original_image #get original image
-        masked_img = img #copy original image
+        masked_img = img.copy() #copy original image
         superpixels = image.superpixels #get original superpixels
         superpixel_ids = np.unique(superpixels) #get superpixels identifiers
         
