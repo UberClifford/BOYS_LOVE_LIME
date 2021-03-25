@@ -70,6 +70,11 @@ class Explainer():
         image.masked_image = masked_img 
 
     def sample_superpixels(self, image, num_samples):
+        """
+        Samples different configurations of turned on superpixels for the image.
+        image: ImageObject
+        num_samples: number of different superpixel configurations to sample
+        """
         # sample num_samples collections of superpixels
         num_superpixels = np.unique(image.superpixels).size
         superpixel_samples = np.random.randint(2, size=(num_samples, num_superpixels))
