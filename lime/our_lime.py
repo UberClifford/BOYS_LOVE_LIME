@@ -5,6 +5,8 @@ from pathlib import Path
 from PIL import Image
 from skimage.segmentation import felzenszwalb, slic, quickshift
 from sklearn.metrics import pairwise_distances
+from sklearn.linear_model import Ridge
+from torchvision import transforms
 import numpy as np 
 import torch
 import torch.nn.functional as F
@@ -128,7 +130,7 @@ class Explainer():
         # make an array of ones (i.e. all superpixels on)
         no_mask_array = np.ones(superpixel_samples.shape[1]).reshape(1, -1)
         # distances from each sample to original
-        distances = pairwise_distances(superpixel_samples, no_mask_array, metric="euclidean")
+        distances = pairwise_distances(superpixel_samples, no_mask_array, metric="cosine")
         return distances.flatten()
 
     def weigh_samples(self, distances):
@@ -145,8 +147,16 @@ class Explainer():
     def select_features(self):
         pass
 
-    def fit_LLR(blackbox_io, weights, labels, regressor = None):
-        pass
+    def fit_LLR(self, samples, weights, labels, regressor = None):
+        """
+        Fits and returns a regression model to the superpixel samples and the classifier outputs.
+        """
+        if regressor is None:
+            model = Ridge()
+        else:
+            model = regressor()
+        model.fit(samples, labels, sample_weight=weights)
+        return model
 
     def explain_image(self, image, num_samples, mask_value = None, top_labels = None, regressor = None):
         if image.superpixels is None:
@@ -208,7 +218,7 @@ class KernelMethod():
         self.method_args = method_args
 
         if self.method == "exponential":
-            self.kernel_method = lambda distances, kernel_width: np.sqrt(np.exp(-(d ** 2) / kernel_width ** 2))
+            self.kernel_method = lambda distances, kernel_width: np.sqrt(np.exp(-(distances ** 2) / kernel_width ** 2))
         elif isinstance(method, str):
             raise KeyError(f"Unknown kernel algorithm: {method}")
         else:
