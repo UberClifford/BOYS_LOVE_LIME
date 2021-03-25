@@ -35,11 +35,17 @@ class ImageObject():
 class Explainer():
 
     def __init__(self, classifier, segmentation_method, kernel_method, num_samples=1000, preprocess_function = None):
+        """
+        Inputs:
+            preprocess_function: Preprocess function that transforms data to be the same as during
+                            blackbox classifier training. If no normalization was used, don't 
+                            use this option.
+        """
         self.classifier = classifier
         self.segmentation_method = segmentation_method
         self.kernel_method = kernel_method
-        self.num_samples = num_samples
-        if preprocess_function is None:
+        self.preprocess_function = preprocess_function
+        if self.preprocess_function is None:
             self.preprocess_function = transforms.Compose([transforms.ToTensor()])
 
     def segment_image(self, image):
@@ -72,14 +78,14 @@ class Explainer():
 
         image.masked_image = masked_img 
 
-    def sample_superpixels(self, image):
+    def sample_superpixels(self, image, num_samples):
         """
         Samples different configurations of turned on superpixels for the image.
         image: ImageObject
         """
         # sample num_samples collections of superpixels
         num_superpixels = np.unique(image.superpixels).size
-        superpixel_samples = np.random.randint(2, size=(self.num_samples, num_superpixels))
+        superpixel_samples = np.random.randint(2, size=(num_samples, num_superpixels))
 
         # apply samlpes to fudged image to generate pertubed images
         sampled_images = list()
@@ -98,23 +104,21 @@ class Explainer():
         Inputs:
             sampled_images: Image samples resulting from different superpixel combinations.
                             List of numpy arrays (rows, col, 3). 
-            preprocess_function: Preprocess function that transforms data to be the same as during
-                                 blackbox classifier training. If no normalization was used, don't 
-                                 use this option.
+
         Outputs:
             blackbox_io: List of tuples. Each tuple -> (sample_image, blackbox_out)
         """
         blackbox_out = list()
         self.classifier.eval()
         for sample_image in sampled_images:
-            sample_image = torch.unsqueeze(preprocess_function(sample_image), dim=0)
+            sample_image = torch.unsqueeze(self.preprocess_function(sample_image), dim=0)
             out = self.classifier(sample_image)
             softmax_out = F.softmax(out, dim = 1)
             labels = torch.squeeze(softmax_out.detach(), dim = 0).numpy()
             blackbox_out.append(labels)
-        blackbox_io = list(zip(sampled_images, blackbox_out))
+        blackbox_out = np.asarray(blackbox_out)
 
-        return blackbox_io
+        return blackbox_out
 
     def get_distances(self, superpixel_samples):
         """
@@ -144,13 +148,20 @@ class Explainer():
     def fit_LLR(blackbox_io, weights, labels, regressor = None):
         pass
 
-    def explain_image(self, image, mask_value = None, top_labels = None, regressor = None):
+    def explain_image(self, image, num_samples, mask_value = None, top_labels = None, regressor = None):
         if image.superpixels is None:
-            self.segment_image(image)
+            self.segment_image(image, num_samples)
         if image.masked_image is None: # What if mask_value changes?
             self.mask_image(image, mask_value)
+
+        #original_blackbox_out = map_blaxbox_io((image,))
+        #if top_labels is not None:
+        #    labels = original_blackbox_out
+        #else:
+        #    labels = list(range(len(original_blackbox_out[0])))
+
         superpixel_samples, sampled_images = sample_superpixels(image)
-        blackbox_io = map_blaxbox_io(sampled_images)
+        blackbox_out = map_blaxbox_io(sampled_images)
         distances = get_distances(superpixel_samples)
         sample_weights = weigh_samples(distances)
         # select_features()
