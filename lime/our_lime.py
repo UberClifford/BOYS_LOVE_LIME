@@ -34,18 +34,20 @@ class ImageObject():
 ### EXPLAINER ###
 class Explainer():
 
-    def __init__(self, classifier, segmentation_method, kernel_method, num_samples=1000):
+    def __init__(self, classifier, segmentation_method, kernel_method, num_samples=1000, preprocess_function = None):
         self.classifier = classifier
         self.segmentation_method = segmentation_method
         self.kernel_method = kernel_method
         self.num_samples = num_samples
-    
+        if preprocess_function is None:
+            self.preprocess_function = transforms.Compose([transforms.ToTensor()])
+
     def segment_image(self, image):
         """
         image: ImageObject
         """
         image.superpixels = self.segmentation_method(image.original_image)        
-        
+
     def mask_image(self, image, mask_value = None):
         """
         Generate mask for pixels in image.
@@ -54,20 +56,20 @@ class Explainer():
                     of the superpixel it belongs to. Else, every pixel is set to
                     mask_value
         """
-        
+
         img = image.original_image #get original image
         masked_img = img.copy() #copy original image
         superpixels = image.superpixels #get original superpixels
         superpixel_ids = np.unique(superpixels) #get superpixels identifiers
-        
+
         #set masked image pixels to average of corresponding superpixel
-        if mask_value == None:
+        if mask_value is None:
             for x in superpixel_ids:
                 masked_img[superpixels == x] = np.mean(img[superpixels == x], axis=0)
         #set masked image pixels to mask_value
         else:
             masked_img[:] = mask_value
-        
+
         image.masked_image = masked_img 
 
     def sample_superpixels(self, image):
@@ -90,8 +92,8 @@ class Explainer():
             sample_masked_image[mask] = image.masked_image[mask]
             sampled_images.append(sample_masked_image)
         return superpixel_samples, sampled_images
-    
-    def map_blaxbox_io(self, sampled_images, preprocess_function = None):    
+
+    def map_blaxbox_io(self, sampled_images):    
         """
         Inputs:
             sampled_images: Image samples resulting from different superpixel combinations.
@@ -104,9 +106,6 @@ class Explainer():
         """
         blackbox_out = list()
         self.classifier.eval()
-        if preprocess_function == None:
-            preprocess_function = transforms.Compose([transforms.ToTensor()])
-    
         for sample_image in sampled_images:
             sample_image = torch.unsqueeze(preprocess_function(sample_image), dim=0)
             out = self.classifier(sample_image)
@@ -117,17 +116,17 @@ class Explainer():
 
         return blackbox_io
 
-    def get_distances(self, samples):
+    def get_distances(self, superpixel_samples):
         """
         Computes the pairwise distance to the original image superpixel configuration and sampled ones.
-        samples: thee list of samples of superpixel configurations
+        superpixel_samples: thee list of samples of superpixel configurations
         """
         # make an array of ones (i.e. all superpixels on)
-        no_mask_array = np.ones(samples.shape[1]).reshape(1, -1)
+        no_mask_array = np.ones(superpixel_samples.shape[1]).reshape(1, -1)
         # distances from each sample to original
-        distances = pairwise_distances(samples, no_mask_array, metric="euclidean")
+        distances = pairwise_distances(superpixel_samples, no_mask_array, metric="euclidean")
         return distances.flatten()
-        
+
     def weigh_samples(self, distances):
         """
         Inputs:
@@ -145,8 +144,18 @@ class Explainer():
     def fit_LLR(blackbox_io, weights, labels, regressor = None):
         pass
 
-    def explain_image(self, image, classifier, top_labels = None, regressor = None):
-        pass
+    def explain_image(self, image, mask_value = None, top_labels = None, regressor = None):
+        if image.superpixels is None:
+            self.segment_image(image)
+        if image.masked_image is None: # What if mask_value changes?
+            self.mask_image(image, mask_value)
+        superpixel_samples, sampled_images = sample_superpixels(self, image)
+        blackbox_io = map_blaxbox_io(self, sampled_images)
+        distances = get_distances(superpixel_samples)
+        sample_weights = weigh_samples(distances)
+        # select_features()
+        # fit_LLR()
+        # create explanation
 
 
 ### SEGMENTATION ###
