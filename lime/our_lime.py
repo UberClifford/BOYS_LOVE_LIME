@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from PIL import Image
 from skimage.segmentation import felzenszwalb, slic, quickshift
+from sklearn.metrics import pairwise_distances
 import numpy as np 
 import torch
 import torch.nn.functional as F
@@ -88,7 +89,7 @@ class Explainer():
                 mask[image.superpixels == superpixel] = True
             sample_masked_image[mask] = image.masked_image[mask]
             sampled_images.append(sample_masked_image)
-        return sampled_images
+        return superpixel_samples, sampled_images
     
     def map_blaxbox_io(self, sampled_images, loaded_model, preprocess_function = None):    
         """
@@ -117,6 +118,17 @@ class Explainer():
 
         return blackbox_io
 
+    def get_distances(self, samples):
+        """
+        Computes the pairwise distance to the original image superpixel configuration and sampled ones.
+        samples: thee list of samples of superpixel configurations
+        """
+        # make an array of ones (i.e. all superpixels on)
+        no_mask_array = np.ones(samples.shape[1]).reshape(1, -1)
+        # distances from each sample to original
+        distances = pairwise_distances(samples, no_mask_array, metric="euclidean")
+        return distances.flatten()
+        
     def weigh_samples_proximity(self, distances):
         """
         Inputs:
