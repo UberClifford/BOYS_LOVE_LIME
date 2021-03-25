@@ -129,16 +129,16 @@ class Explainer():
         distances = pairwise_distances(samples, no_mask_array, metric="euclidean")
         return distances.flatten()
         
-    def weigh_samples_proximity(self, distances):
+    def weigh_samples(self, distances):
         """
         Inputs:
             distances: 1D numpy array. Sample distances to original data point.
 
         Outputs:
-            sample_proximities:  1D numpy array. Sample distances weighed by kernel method.
+            sample_weights:  1D numpy array. Sample distances weighed by kernel method.
         """
-        sample_proximities = self.kernel_method(distances)
-        return sample_proximities
+        sample_weights = self.kernel_method(distances)
+        return sample_weights
 
     def select_features(self):
         pass
