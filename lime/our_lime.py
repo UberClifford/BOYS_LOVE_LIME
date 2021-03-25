@@ -33,15 +33,16 @@ class ImageObject():
 ### EXPLAINER ###
 class Explainer():
 
-    def __init__(self, segmentation_method, num_samples=1000):
+    def __init__(self, segmentation_method, kernel_method, num_samples=1000):
         self.segmentation_method = segmentation_method
+        self.kernel_method = kernel_method
         self.num_samples = num_samples
     
-    def segment_image(self, image, **kwargs):
+    def segment_image(self, image):
         """
         image: ImageObject
         """
-        image.superpixels = self.segmentation_method(image.original_image, **kwargs)        
+        image.superpixels = self.segmentation_method(image.original_image)        
         
     def mask_image(self, image, mask_value = None):
         """
@@ -110,16 +111,29 @@ class Explainer():
         blackbox_io = list(zip(sampled_images, blackbox_out))
 
         return blackbox_io
-    
-        
+
+    def weigh_samples_proximity(self, distances):
+        """
+        Inputs:
+            distances: 1D numpy array. Sample distances to original data point.
+
+        Outputs:
+            sample_proximities:  1D numpy array. Sample distances weighed by kernel method.
+        """
+        sample_proximities = self.kernel_method(distances)
+        return sample_proximities
+
+
 ### SEGMENTATION ###
 class SegmentationMethod():
 
-    def __init__(self, method="quickshift"):
+    def __init__(self, method="quickshift", **method_args):
         """
         Set image segmentation method as a predefined algorithm or custom function
         """
-        self.method = method        
+        self.method = method
+        self.method_args = method_args
+
         if self.method == "quickshift":
             self.segmentation_method = quickshift
         elif self.method == "felzenszwalb":
@@ -131,8 +145,32 @@ class SegmentationMethod():
         else:
             self.segmentation_method = method
                 
-    def __call__(self, img, **kwargs):
+    def __call__(self, img):
         """
         Run segmentation method on image
         """
-        return self.segmentation_method(img, **kwargs)
+        return self.segmentation_method(img, **self.method_args)
+
+
+### SIMILARITY KERNEL ###
+class KernelMethod():
+
+    def __init__(self, method="exponential", **method_args):
+        """
+        Set similarity kernel method as a predefined algorithm or custom function
+        """
+        self.method = method
+        self.method_args = method_args
+
+        if self.method == "exponential":
+            self.kernel_method = lambda distances, kernel_width: np.sqrt(np.exp(-(d ** 2) / kernel_width ** 2))
+        elif isinstance(method, str):
+            raise KeyError(f"Unknown kernel algorithm: {method}")
+        else:
+            self.kernel_method = method
+
+    def __call__(self, distances):
+        """
+        Run kernel method on distances
+        """
+        return self.kernel_method(distances, **self.method_args)
