@@ -149,8 +149,8 @@ class Explainer():
             self.segment_image(image)
         if image.masked_image is None: # What if mask_value changes?
             self.mask_image(image, mask_value)
-        superpixel_samples, sampled_images = sample_superpixels(self, image)
-        blackbox_io = map_blaxbox_io(self, sampled_images)
+        superpixel_samples, sampled_images = sample_superpixels(image)
+        blackbox_io = map_blaxbox_io(sampled_images)
         distances = get_distances(superpixel_samples)
         sample_weights = weigh_samples(distances)
         # select_features()
