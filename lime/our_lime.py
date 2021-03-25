@@ -33,7 +33,8 @@ class ImageObject():
 ### EXPLAINER ###
 class Explainer():
 
-    def __init__(self, segmentation_method, kernel_method, num_samples=1000):
+    def __init__(self, classifier, segmentation_method, kernel_method, num_samples=1000):
+        self.classifier = classifier
         self.segmentation_method = segmentation_method
         self.kernel_method = kernel_method
         self.num_samples = num_samples
@@ -85,12 +86,11 @@ class Explainer():
             sampled_images.append(sample_masked_image)
         return sampled_images
     
-    def map_blaxbox_io(self, sampled_images, loaded_model, preprocess_function = None):    
+    def map_blaxbox_io(self, sampled_images, preprocess_function = None):    
         """
         Inputs:
             sampled_images: Image samples resulting from different superpixel combinations.
                             List of numpy arrays (rows, col, 3). 
-            loaded_model: Blackbox classifier with loaded weights.
             preprocess_function: Preprocess function that transforms data to be the same as during
                                  blackbox classifier training. If no normalization was used, don't 
                                  use this option.
@@ -98,13 +98,13 @@ class Explainer():
             blackbox_io: List of tuples. Each tuple -> (sample_image, blackbox_out)
         """
         blackbox_out = list()
-        loaded_model.eval()
+        self.classifier.eval()
         if preprocess_function == None:
             preprocess_function = transforms.Compose([transforms.ToTensor()])
     
         for sample_image in sampled_images:
             sample_image = torch.unsqueeze(preprocess_function(sample_image), dim=0)
-            out = loaded_model(sample_image)
+            out = self.classifier(sample_image)
             softmax_out = F.softmax(out, dim = 1)
             labels = torch.squeeze(softmax_out.detach(), dim = 0).numpy()
             blackbox_out.append(labels)
@@ -122,6 +122,15 @@ class Explainer():
         """
         sample_proximities = self.kernel_method(distances)
         return sample_proximities
+
+    def select_features(self):
+        pass
+
+    def fit_LLR(blackbox_io, weights, labels, regressor = None):
+        pass
+
+    def explain_image(self, image, classifier, top_labels = None, regressor = None):
+        pass
 
 
 ### SEGMENTATION ###
