@@ -117,17 +117,18 @@ class Explainer():
         Outputs:
             blackbox_io: List of tuples. Each tuple -> (sample_image, blackbox_out)
         """
-        blackbox_out = list()
+        sample_labels = list()
         self.classifier.eval()
-        for sample_image in sampled_images:
-            sample_image = torch.unsqueeze(self.preprocess_function(sample_image), dim=0)
-            out = self.classifier(sample_image)
-            softmax_out = F.softmax(out, dim = 1)
-            labels = torch.squeeze(softmax_out.detach(), dim = 0).numpy()
-            blackbox_out.append(labels)
-        blackbox_out = np.asarray(blackbox_out)
+        with torch.no_grad():
+            for sample_image in sampled_images:
+                sample_image = torch.unsqueeze(self.preprocess_function(sample_image), dim=0).to(self.device)
+                out = self.classifier(sample_image)
+                softmax_out = F.softmax(out, dim = 1)
+                labels = torch.squeeze(softmax_out, dim = 0).detach().cpu().numpy()
+                sample_labels.append(labels)
+        sample_labels = np.asarray(sample_labels)
 
-        return blackbox_out
+        return sample_labels
 
     def get_distances(self, superpixel_samples):
         """
