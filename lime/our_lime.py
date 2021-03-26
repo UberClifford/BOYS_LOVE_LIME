@@ -22,21 +22,21 @@ class ImageObject():
             self.original_image = original_image
         else:
             self.original_image = np.array(original_image)
-        
+
         self.masked_image = None
         self.superpixels = None
-        self.shape = np.array(original_image).shape
+        self.shape = self.original_image.shape
 
     def show(self):
         """Display original image"""
-        img = self.original_image
+        plt.imshow(self.original_image)
         plt.imshow(img)
 
 
 ### EXPLAINER ###
 class Explainer():
 
-    def __init__(self, classifier, segmentation_method, kernel_method, num_samples=1000, preprocess_function = None):
+    def __init__(self, classifier, segmentation_method, kernel_method, preprocess_function = None, device = None):
         """
         Inputs:
             preprocess_function: Preprocess function that transforms data to be the same as during
@@ -46,9 +46,16 @@ class Explainer():
         self.classifier = classifier
         self.segmentation_method = segmentation_method
         self.kernel_method = kernel_method
-        self.preprocess_function = preprocess_function
+        if preprocess_function is None:
         if self.preprocess_function is None:
             self.preprocess_function = transforms.Compose([transforms.ToTensor()])
+        else:
+            self.preprocess_function = preprocess_function
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = device
+        self.classifier = classifier.to(self.device)
 
     def segment_image(self, image):
         """
@@ -89,7 +96,7 @@ class Explainer():
         num_superpixels = np.unique(image.superpixels).size
         superpixel_samples = np.random.randint(2, size=(num_samples, num_superpixels))
 
-        # apply samlpes to fudged image to generate pertubed images
+        # apply samples to fudged image to generate pertubed images
         sampled_images = list()
         for sample in superpixel_samples:
             sample_masked_image = image.original_image.copy()
@@ -154,7 +161,7 @@ class Explainer():
         if regressor is None:
             model = Ridge()
         else:
-            model = regressor()
+            model = regressor
         model.fit(samples, labels, sample_weight=weights)
         return model
 
