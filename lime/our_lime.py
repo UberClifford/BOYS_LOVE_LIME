@@ -163,25 +163,30 @@ class Explainer():
         model.fit(samples, labels, sample_weight=weights)
         return model
 
-    def explain_image(self, image, num_samples, mask_value = None, top_labels = None, regressor = None):
+    def explain_image(self, image, num_samples, top_labels = None, mask_value = None, regressor = None):
         if image.superpixels is None:
             self.segment_image(image, num_samples)
         if image.masked_image is None: # What if mask_value changes?
             self.mask_image(image, mask_value)
 
-        #original_blackbox_out = map_blaxbox_io((image,))
-        #if top_labels is not None:
-        #    labels = original_blackbox_out
-        #else:
-        #    labels = list(range(len(original_blackbox_out[0])))
+        superpixel_samples, sampled_images = self.sample_superpixels(image, num_samples)
+        distances = self.get_distances(superpixel_samples)
+        sample_weights = self.weigh_samples(distances)
+        sample_labels = self.map_blaxbox_io(sampled_images)
 
-        superpixel_samples, sampled_images = sample_superpixels(image)
-        blackbox_out = map_blaxbox_io(sampled_images)
-        distances = get_distances(superpixel_samples)
-        sample_weights = weigh_samples(distances)
         # select_features()
-        # fit_LLR()
-        # create explanation
+
+        if top_labels is None:
+            labels = np.arange(sample_labels.shape[1])
+        else:
+            original_labels = self.map_blaxbox_io((image.original_image,))
+            labels = np.flip(np.argsort(original_labels[0])[-top_labels:])
+
+        LLR_model = self.fit_LLR(superpixel_samples, sample_weights, sample_labels, regressor)
+
+        # create_explanation()
+
+        return LLR_model
 
 
 ### SEGMENTATION ###
