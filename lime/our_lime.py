@@ -15,8 +15,11 @@ import torch.nn.functional as F
 class ImageObject():
     
     def __init__(self, original_image):
-        """Initialize image object"""
+        """Initialize image object
         
+        Inputs:
+            original_image: any object that can be turned into a numpy array of shape (W,H) or (W,H,C)
+        """
         #keep image as numpy array
         if type(original_image) == np.ndarray:
             self.original_image = original_image
@@ -37,10 +40,16 @@ class Explainer():
 
     def __init__(self, classifier, segmentation_method, kernel_method, preprocess_function = None, device = None):
         """
+        Initialize LIME Explainer
+
         Inputs:
+            classifier: pytorch image classifier model. Should output logits.
+            segmentation_method: SegmentationMethod
+            kernel_method: KernelMethod
             preprocess_function: Preprocess function that transforms data to be the same as during
-                            blackbox classifier training. If no normalization was used, don't 
-                            use this option.
+                                 blackbox classifier training. If no normalization was used, don't 
+                                 use this option.
+            device: pytorch device to use, default is cuda if available else cpu.
         """
         self.segmentation_method = segmentation_method
         self.kernel_method = kernel_method
@@ -56,17 +65,22 @@ class Explainer():
 
     def segment_image(self, image):
         """
-        image: ImageObject
+        Segment image pixels into superpixels
+
+        Inputs:
+            image: ImageObject
         """
         image.superpixels = self.segmentation_method(image.original_image)        
 
     def mask_image(self, image, mask_value = None):
         """
         Generate mask for pixels in image.
-        image: ImageObject
-        mask_value: If mask_value = None, then each masked pixel is the average
-                    of the superpixel it belongs to. Else, every pixel is set to
-                    mask_value
+        
+        Inputs:
+            image: ImageObject
+            mask_value: If mask_value = None, then each masked pixel is the average
+                        of the superpixel it belongs to. Else, every pixel is set to
+                        mask_value
         """
 
         img = image.original_image #get original image
@@ -87,7 +101,16 @@ class Explainer():
     def sample_superpixels(self, image, num_samples):
         """
         Samples different configurations of turned on superpixels for the image.
-        image: ImageObject
+        
+        Inputs:
+            image: ImageObject
+            num_samples: number of different superpixel configurations to sample
+
+        Outputs:
+            superpixel_samples: numpy array of shape (num_samples, num_superpixels).
+                                Superpixels on/off indicator for each sample.
+            sampled_images: list of numpy arrays.
+                            Sampled image with superpixels randomly tuned on/off. 
         """
         # sample num_samples collections of superpixels
         num_superpixels = np.unique(image.superpixels).size
@@ -107,12 +130,14 @@ class Explainer():
 
     def map_blaxbox_io(self, sampled_images):    
         """
+        Map samples to predicted labels/categories using blackbox classifier
+
         Inputs:
             sampled_images: Image samples resulting from different superpixel combinations.
                             List of numpy arrays (rows, col, 3). 
 
         Outputs:
-            blackbox_io: List of tuples. Each tuple -> (sample_image, blackbox_out)
+            sample_labels: Numpy array of shape (num_samples, num_labels). Predicted labels for each sample.
         """
         sample_labels = list()
         self.classifier.eval()
@@ -130,7 +155,12 @@ class Explainer():
     def get_distances(self, superpixel_samples):
         """
         Computes the pairwise distance to the original image superpixel configuration and sampled ones.
-        superpixel_samples: thee list of samples of superpixel configurations
+
+        Inputs:
+            superpixel_samples: the list of samples of superpixel configurations
+
+        Outputs:
+            distances: 1D numpy array. Distances from superpixel samples to original image
         """
         # make an array of ones (i.e. all superpixels on)
         no_mask_array = np.ones(superpixel_samples.shape[1]).reshape(1, -1)
@@ -140,21 +170,36 @@ class Explainer():
 
     def weigh_samples(self, distances):
         """
+        Weigh samples using kernel function on sample distances from original image
+
         Inputs:
-            distances: 1D numpy array. Sample distances to original data point.
+            distances: 1D numpy array. Distances from superpixel samples to original image
 
         Outputs:
-            sample_weights:  1D numpy array. Sample distances weighed by kernel method.
+            sample_weights: 1D numpy array. Sample distances weighed by kernel method.
         """
         sample_weights = self.kernel_method(distances)
         return sample_weights
 
     def select_features(self):
+        """
+        Superpixel selection to reduce complexity of explanation.
+        """
         pass
 
     def fit_LLR(self, samples, weights, labels, regressor = None):
         """
         Fits and returns a regression model to the superpixel samples and the classifier outputs.
+
+        Input:
+            samples: numpy array of shape (num_samples, num_superpixels).
+                     Superpixels on/off indicator for each sample.
+            weights: 1D numpy array. Sample distances weighed by kernel method.
+            labels: Numpy array of shape (num_samples, num_labels). Predicted labels for each sample.
+            regressor: Linear regressor to use, default is ridge regression.
+        
+        Outputs:
+            model: Local linear regression model fitted to image.
         """
         if regressor is None:
             model = Ridge()
@@ -164,6 +209,22 @@ class Explainer():
         return model
 
     def explain_image(self, image, num_samples, top_labels = None, mask_value = None, regressor = None):
+        """
+        Explain image using superpixels.
+
+        Inputs:
+            image: ImageObject
+            num_samples: Number of samples to use for local linear regression of image
+            top_labels: Number of labels/categories from classifier to include in explanation.
+                        Labels are picked from highest to lowest predicted for the image. Default is all labels.
+            mask_value: If mask_value = None, then each masked pixel is the average
+                        of the superpixel it belongs to. Else, every pixel is set to
+                        mask_value
+            regressor: Linear regressor to use, default is ridge regression.
+
+        Outputs:
+            explanation
+        """
         if image.superpixels is None:
             self.segment_image(image, num_samples)
         if image.masked_image is None: # What if mask_value changes?
@@ -195,6 +256,12 @@ class SegmentationMethod():
     def __init__(self, method="quickshift", **method_args):
         """
         Set image segmentation method as a predefined algorithm or custom function
+
+        Inputs:
+            method: Either a string specifying one of predefined segmentaion algorithms:
+                    "quickshift", "felzenszwalb", "slic",
+                    Or a custom segmentation function.
+            method_args: Any extra arguments needed by the chosen method.
         """
         self.method = method
         self.method_args = method_args
@@ -223,6 +290,12 @@ class KernelMethod():
     def __init__(self, method="exponential", **method_args):
         """
         Set similarity kernel method as a predefined algorithm or custom function
+
+        Inputs:
+            method: Either a string specifying one of predefined segmentaion algorithms:
+                    "exponential",
+                    Or a custom kernel function.
+            method_args: Any extra arguments needed by the chosen method.
         """
         self.method = method
         self.method_args = method_args
