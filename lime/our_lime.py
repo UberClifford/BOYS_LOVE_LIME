@@ -30,7 +30,6 @@ class ImageObject():
     def show(self):
         """Display original image"""
         plt.imshow(self.original_image)
-        plt.imshow(img)
 
 
 ### EXPLAINER ###
@@ -43,11 +42,9 @@ class Explainer():
                             blackbox classifier training. If no normalization was used, don't 
                             use this option.
         """
-        self.classifier = classifier
         self.segmentation_method = segmentation_method
         self.kernel_method = kernel_method
         if preprocess_function is None:
-        if self.preprocess_function is None:
             self.preprocess_function = transforms.Compose([transforms.ToTensor()])
         else:
             self.preprocess_function = preprocess_function
