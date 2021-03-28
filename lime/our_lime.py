@@ -251,10 +251,16 @@ class Explainer():
         
         #mask to indicate important superpixels for labels
         self.label_masks = np.zeros(np.shape(image.superpixels), dtype = int)
-        mask_int = 1
 
         #fit local linear models
         for label in labels:
+            #positive class
+            if label == labels[0]:
+                mask_int = 1
+            #negative class(es)
+            else:
+                mask_int = -1
+            
             #slice label
             sample_label = sample_labels[:, label]
             LLR_model, r2_score = self.fit_LLR(superpixel_samples, sample_weights, sample_label, regressor)
@@ -273,8 +279,6 @@ class Explainer():
             display_superpixels = [superpixel_weights[i][0] for i in range(num_superpixels)]
             for pixel in display_superpixels:
                 self.label_masks[image.superpixels == pixel] = mask_int
-                
-            mask_int += 1
            
     def display_image_explanation(self, image):
         """
