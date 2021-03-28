@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from PIL import Image
-from skimage.segmentation import felzenszwalb, slic, quickshift
+from skimage.segmentation import felzenszwalb, slic, quickshift, mark_boundaries
 from sklearn.metrics import pairwise_distances
 from sklearn.linear_model import Ridge
 from torchvision import transforms
@@ -53,6 +53,8 @@ class Explainer():
         """
         self.segmentation_method = segmentation_method
         self.kernel_method = kernel_method
+        self.mask_labels = None # superpixels in important for labels
+        
         if preprocess_function is None:
             self.preprocess_function = transforms.Compose([transforms.ToTensor()])
         else:
@@ -62,7 +64,8 @@ class Explainer():
         else:
             self.device = device
         self.classifier = classifier.to(self.device)
-
+        
+        
     def segment_image(self, image):
         """
         Segment image pixels into superpixels
@@ -120,8 +123,8 @@ class Explainer():
         sampled_images = list()
         for sample in superpixel_samples:
             sample_masked_image = image.original_image.copy()
-            turned_on_superpixels = np.where(sample == 1)[0]
-            mask = np.zeros(image.superpixels.shape).astype(bool)
+            turned_on_superpixels = np.where(sample == 1)[0] # get indices for turned on indices
+            mask = np.zeros(image.superpixels.shape).astype(bool) 
             for superpixel in turned_on_superpixels:  # turn on the sampled pixels
                 mask[image.superpixels == superpixel] = True
             sample_masked_image[mask] = image.masked_image[mask]
@@ -205,10 +208,13 @@ class Explainer():
             model = Ridge()
         else:
             model = regressor
+        #fit model
         model.fit(samples, labels, sample_weight=weights)
-        return model
+        #get R^2-score
+        r2_score = model.score(samples, labels, sample_weight=weights)
+        return model, r2_score
 
-    def explain_image(self, image, num_samples, top_labels = None, mask_value = None, regressor = None):
+    def explain_image(self, image, num_samples, classes, top_labels = None, mask_value = None, regressor = None, num_superpixels = 5):
         """
         Explain image using superpixels.
 
@@ -223,7 +229,7 @@ class Explainer():
             regressor: Linear regressor to use, default is ridge regression.
 
         Outputs:
-            explanation
+            explanatory variables: best superpixels for class(es), model intercept, R^2 score, prediction on original image 
         """
         if image.superpixels is None:
             self.segment_image(image, num_samples)
@@ -242,12 +248,45 @@ class Explainer():
         else:
             original_labels = self.map_blaxbox_io((image.original_image,))
             labels = np.flip(np.argsort(original_labels[0])[-top_labels:])
+        
+        #mask to indicate important superpixels for labels
+        self.label_masks = np.zeros(np.shape(image.superpixels), dtype = int)
+        mask_int = 1
 
-        LLR_model = self.fit_LLR(superpixel_samples, sample_weights, sample_labels, regressor)
-
-        # create_explanation()
-
-        return LLR_model
+        #fit local linear models
+        for label in labels:
+            #slice label
+            sample_label = sample_labels[:, label]
+            LLR_model, r2_score = self.fit_LLR(superpixel_samples, sample_weights, sample_label, regressor)
+            #get superpixels weights and sort from abs. high to low
+            superpixel_weights = [(coef[0], coef[1]) for coef in enumerate(LLR_model.coef_)]
+            superpixel_weights.sort(key = lambda tup: abs(tup[1]), reverse = True)
+            
+            origin_image_superpixels = np.arange( np.shape(superpixel_samples)[1] )
+            LLR_pred = LLR_model.predict( origin_image_superpixels.reshape(1, -1) )
+            intercept = LLR_model.intercept_
+            
+            #print some results 
+            print(f"Class stats: {classes[label]}\nIntercept:{intercept} R^2:{r2_score} Prediction on ori. image {LLR_pred}")
+            
+            #create label mask area from best_superpixels
+            display_superpixels = [superpixel_weights[i][0] for i in range(num_superpixels)]
+            for pixel in display_superpixels:
+                self.label_masks[image.superpixels == pixel] = mask_int
+                
+            mask_int += 1
+           
+    def display_image_explanation(self, image):
+        """
+        Display image with label masks
+        Inputs:
+            image: ImageObject
+        """
+        img_boundary = mark_boundaries(image.original_image, self.label_masks)
+        plt.imshow(img_boundary)
+        
+        
+        
 
 
 ### SEGMENTATION ###
