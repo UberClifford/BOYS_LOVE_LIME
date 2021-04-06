@@ -72,6 +72,9 @@ class Explainer():
 
         Inputs:
             image: ImageObject
+        Outputs:
+            image.superpixels. A 2D numpy array with a shape corresponding to the number of pixels in image.
+                               Each value indicates the superpixel that a pixel belongs to.
         """
         image.superpixels = self.segmentation_method(image.original_image)        
 
@@ -246,10 +249,11 @@ class Explainer():
         if top_labels is None:
             labels = np.arange(sample_labels.shape[1])
         else:
+            #get original blackbox labels as sorted list, where highest at first index (positive class)
             original_labels = self.map_blaxbox_io((image.original_image,))
             labels = np.flip(np.argsort(original_labels[0])[-top_labels:])
         
-        #mask to indicate important superpixels for labels
+        #mask for important label superpixels
         self.label_masks = np.zeros(np.shape(image.superpixels), dtype = int)
 
         #fit local linear models
@@ -285,6 +289,8 @@ class Explainer():
         Display image with label masks
         Inputs:
             image: ImageObject
+        Output:
+            image with explanatory superpixels marked as masks 
         """
         img_boundary = mark_boundaries(image.original_image, self.label_masks)
         plt.imshow(img_boundary)
