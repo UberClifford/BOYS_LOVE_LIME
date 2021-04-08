@@ -1,5 +1,6 @@
 ### IMPORTS ###
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 from pathlib import Path
 from PIL import Image
@@ -53,7 +54,6 @@ class Explainer():
         """
         self.segmentation_method = segmentation_method
         self.kernel_method = kernel_method
-        self.mask_labels = None # superpixels in important for labels
         
         if preprocess_function is None:
             self.preprocess_function = transforms.Compose([transforms.ToTensor()])
@@ -153,6 +153,7 @@ class Explainer():
                 out = self.classifier(sample_image)
                 softmax_out = F.softmax(out, dim = 1)
                 labels = torch.squeeze(softmax_out, dim = 0).detach().cpu().numpy()
+#                labels = torch.squeeze(out, dim = 0).detach().cpu().numpy() 
                 sample_labels.append(labels)
         sample_labels = np.asarray(sample_labels)
 
@@ -253,51 +254,53 @@ class Explainer():
             original_labels = self.map_blaxbox_io((image.original_image,))
             labels = np.flip(np.argsort(original_labels[0])[-top_labels:])
         
-        #mask for important label superpixels
-        self.label_masks = np.zeros(np.shape(image.superpixels), dtype = int)
+        #mask for important label superpixels and original image superpixels (all superpixels)
+        N = len(labels)
+        mask_int = 1
+        label_masks = [np.zeros(np.shape(image.superpixels), dtype = int) for i in range(N)]
+        origin_image_superpixels = np.arange( np.shape(superpixel_samples)[1] )
 
         #fit local linear models
-        for label in labels:
-            #positive class
-            if label == labels[0]:
-                mask_int = 1
-            #negative class(es)
-            else:
-                mask_int = -1
-            
+        for l in range (N):
             #slice label
-            sample_label = sample_labels[:, label]
+            sample_label = sample_labels[:, labels[l]]
             LLR_model, r2_score = self.fit_LLR(superpixel_samples, sample_weights, sample_label, regressor)
-            #get superpixels weights and sort from abs. high to low
+            #coefficient for X1, X2, X3 superpixels correspond superpixel ids 0,1,2,3. 
             superpixel_weights = [(coef[0], coef[1]) for coef in enumerate(LLR_model.coef_)]
+
+            #sort from abs. high to low on superpixel weights
             superpixel_weights.sort(key = lambda tup: abs(tup[1]), reverse = True)
-            
-            origin_image_superpixels = np.arange( np.shape(superpixel_samples)[1] )
             LLR_pred = LLR_model.predict( origin_image_superpixels.reshape(1, -1) )
             intercept = LLR_model.intercept_
             
             #print some results 
-            print(f"Class stats: {classes[label]}\nIntercept:{intercept} R^2:{r2_score} Prediction on ori. image {LLR_pred}")
+            print(f"Class stats: {classes[labels[l]]}\nIntercept:{intercept} R^2:{r2_score} Prediction on ori. image {LLR_pred}")
             
-            #create label mask area from best_superpixels
+            #get num_superpixels amount superpixel_ids
             display_superpixels = [superpixel_weights[i][0] for i in range(num_superpixels)]
+            #create label mask area from best_superpixels
             for pixel in display_superpixels:
-                self.label_masks[image.superpixels == pixel] = mask_int
+                label_masks[l][image.superpixels == pixel] = mask_int
+            
+            #display image
+            self.display_image_explanation(image, label_masks[l])
+            #how to get coefficients
            
-    def display_image_explanation(self, image):
+    def display_image_explanation(self, image, label_mask):
         """
         Display image with label masks
         Inputs:
             image: ImageObject
+            label_mask: 2D array 
         Output:
             image with explanatory superpixels marked as masks 
         """
-        img_boundary = mark_boundaries(image.original_image, self.label_masks)
+        R, G, B = random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
+        plt.figure()
+        img_boundary = mark_boundaries(image.original_image, label_mask, color = (R/255, G/255, B/255),
+                                       outline_color = (R/255, G/255, B/255))
         plt.imshow(img_boundary)
         
-        
-        
-
 
 ### SEGMENTATION ###
 class SegmentationMethod():
