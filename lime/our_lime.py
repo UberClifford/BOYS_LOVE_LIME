@@ -153,7 +153,6 @@ class Explainer():
                 out = self.classifier(sample_image)
                 softmax_out = F.softmax(out, dim = 1)
                 labels = torch.squeeze(softmax_out, dim = 0).detach().cpu().numpy()
-#                labels = torch.squeeze(out, dim = 0).detach().cpu().numpy() 
                 sample_labels.append(labels)
         sample_labels = np.asarray(sample_labels)
 
@@ -254,6 +253,7 @@ class Explainer():
             original_labels = self.map_blaxbox_io((image.original_image,))
             labels = np.flip(np.argsort(original_labels[0])[-top_labels:])
         
+        print(labels)
         #mask for important label superpixels and original image superpixels (all superpixels)
         N = len(labels)
         mask_int = 1
@@ -261,15 +261,13 @@ class Explainer():
         origin_image_superpixels = np.arange( np.shape(superpixel_samples)[1] )
 
         #fit local linear models
-        for l in range (N):
+        for l in labels:
             #slice label
             sample_label = sample_labels[:, labels[l]]
             LLR_model, r2_score = self.fit_LLR(superpixel_samples, sample_weights, sample_label, regressor)
             #coefficient for X1, X2, X3 superpixels correspond superpixel ids 0,1,2,3. 
             superpixel_weights = [(coef[0], coef[1]) for coef in enumerate(LLR_model.coef_)]
-
-            #sort from abs. high to low on superpixel weights
-            superpixel_weights.sort(key = lambda tup: abs(tup[1]), reverse = True)
+            superpixel_weights.sort(key = lambda tup: tup[1], reverse = True)
             LLR_pred = LLR_model.predict( origin_image_superpixels.reshape(1, -1) )
             intercept = LLR_model.intercept_
             
