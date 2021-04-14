@@ -1,0 +1,15 @@
+
+
+#1 Download val 017 coco images and annotations.
+# https://cocodataset.org/#download  
+# instances_val2017.json (annotations)
+# val2017                (images)
+
+#2 Get Cat and dog images
+python get_images.py -i val2017/val2017/ -a ./annotations_trainval2017/annotations/instances_val2017.json -t ./CocoCatsVsDogs/cats/ -c cat
+python get_images.py -i val2017/val2017/ -a ./annotations_trainval2017/annotations/instances_val2017.json -t ./CocoCatsVsDogs/cats -c dog
+
+#3 Get Cat and dog annotations 
+#Script taken from https://github.com/immersive-limit/coco-manager
+python filter.py --input_json ./annotations_trainval2017/annotations/instances_val2017.json --output_json ./catval2017_annotations.json --categories cat
+python filter.py --input_json ./annotations_trainval2017/annotations/instances_val2017.json --output_json ./dogval2017_annotations.json --categories dog
