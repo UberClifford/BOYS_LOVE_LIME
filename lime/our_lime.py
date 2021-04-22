@@ -29,6 +29,7 @@ class ImageObject():
 
         self.masked_image = None
         self.superpixels = None
+        self.label_masks = None
         self.shape = self.original_image.shape
 
     def show(self):
@@ -217,15 +218,18 @@ class Explainer():
         r2_score = model.score(samples, labels, sample_weight=weights)
         return model, r2_score
 
-    def explain_image(self, image, num_samples, classes, top_labels = None, mask_value = None, regressor = None, num_superpixels = 5):
+    def explain_image(self, image, num_samples, classes, labels = None, top_labels = None, mask_value = None, regressor = None, num_superpixels = 5):
         """
         Explain image using superpixels.
 
         Inputs:
             image: ImageObject
             num_samples: Number of samples to use for local linear regression of image
+            labels: Specified Labels/categories to include in explanation (list/array of integers).
+                    Mutually exclusive with top_labels (default is all labels).
             top_labels: Number of labels/categories from classifier to include in explanation.
-                        Labels are picked from highest to lowest predicted for the image. Default is all labels.
+                        Labels are picked from highest to lowest predicted for the image.
+                        Mutually exclusive with labels (default is all labels).
             mask_value: If mask_value = None, then each masked pixel is the average
                         of the superpixel it belongs to. Else, every pixel is set to
                         mask_value
@@ -234,6 +238,10 @@ class Explainer():
         Outputs:
             explanatory variables: best superpixels for class(es), model intercept, R^2 score, prediction on original image 
         """
+
+        if (labels is not None) and (top_labels is not None):
+            raise ValueError("labels and top_labels cannot both be specified.")
+
         if image.superpixels is None:
             self.segment_image(image, num_samples)
         if image.masked_image is None: # What if mask_value changes?
@@ -246,12 +254,14 @@ class Explainer():
 
         # select_features()
 
-        if top_labels is None:
-            labels = np.arange(sample_labels.shape[1])
-        else:
+        if labels is not None:
+            labels = np.asarray(labels)
+        if top_labels is not None:
             #get original blackbox labels as sorted list, where highest at first index (positive class)
             original_labels = self.map_blaxbox_io((image.original_image,))
             labels = np.flip(np.argsort(original_labels[0])[-top_labels:])
+        else:
+            labels = np.arange(sample_labels.shape[1])
         
         #mask for important label superpixels and original image superpixels (all superpixels)
         N = len(labels)
@@ -284,6 +294,8 @@ class Explainer():
             #display image
             self.display_image_explanation(image, label_masks[l])
             #how to get coefficients
+        
+        image.label_masks = label_masks
            
     def display_image_explanation(self, image, label_mask):
         """
