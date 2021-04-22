@@ -11,6 +11,9 @@ from torchvision import transforms
 import numpy as np 
 import torch
 import torch.nn.functional as F
+from pycocotools.coco import COCO
+from shutil import copy
+import os
 
 ### IMAGE ### 
 class ImageObject():
@@ -258,7 +261,6 @@ class Explainer():
         mask_int = 1
         label_masks = [np.zeros(np.shape(image.superpixels), dtype = int) for i in range(N)]
         origin_image_superpixels = np.arange( np.shape(superpixel_samples)[1] )
- 
 
         #fit local linear models
         for l in labels:
@@ -267,7 +269,6 @@ class Explainer():
             LLR_model, r2_score = self.fit_LLR(superpixel_samples, sample_weights, sample_label, regressor)
             #coefficient for X1, X2, X3 superpixels correspond superpixel ids 0,1,2,3. 
             superpixel_weights = [(coef[0], coef[1]) for coef in enumerate(LLR_model.coef_)]
-            
             superpixel_weights.sort(key = lambda tup: tup[1])
             LLR_pred = LLR_model.predict( origin_image_superpixels.reshape(1, -1) )
             intercept = LLR_model.intercept_
@@ -300,7 +301,44 @@ class Explainer():
                                        outline_color = (R/255, G/255, B/255))
         plt.imshow(img_boundary)
         
+        
+    def get_coco_data_and_binary_masks(self, coco_data, coco_annotations, coco_target, category):
+    
+        coco = COCO(coco_annotations)
+        filter_classes = [category] 
+        category_ids = coco.getCatIds(catNms = filter_classes)
+        image_ids = coco.getImgIds(catIds = category_ids)
+        images = coco.loadImgs(image_ids)
+        category_folder = coco_target / category
+        masks_dict = dict()
+        
+        if not os.path.isdir(category_folder):
+            os.makedirs(category_folder)
 
+        for idx, image in enumerate(images):
+            _id = image['id']  
+            ann_ids = coco.getAnnIds(imgIds = [_id], catIds = category_ids, iscrowd = None)
+    
+            anns = coco.loadAnns(ann_ids)
+            if not anns:
+                continue
+
+            masks = list(map(coco.annToMask, anns)) 
+            final_mask = np.zeros_like(masks[0])
+            for mask in masks:
+                final_mask = np.bitwise_or(final_mask, mask)
+    
+            # Save image
+            src = coco_data / image['file_name']
+            ext = str(src).split('.')[-1]
+            dst_file_name = f'{idx}.{ext}'
+        
+            dst = category_folder / dst_file_name
+            copy(src, dst)
+            masks_dict[dst_file_name] = final_mask
+        
+        return masks_dict
+        
 ### SEGMENTATION ###
 class SegmentationMethod():
 
@@ -335,6 +373,7 @@ class SegmentationMethod():
         return self.segmentation_method(img, **self.method_args)
 
 
+    
 ### SIMILARITY KERNEL ###
 class KernelMethod():
 
