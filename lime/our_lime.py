@@ -221,7 +221,7 @@ class Explainer():
         r2_score = model.score(samples, labels, sample_weight=weights)
         return model, r2_score
 
-    def explain_image(self, image, num_samples, classes, labels = None, top_labels = None, mask_value = None, regressor = None, num_superpixels = 5):
+    def explain_image(self, image, num_samples, classes, labels = None, top_labels = None, mask_value = None, regressor = None, num_superpixels = 5, display = False):
         """
         Explain image using superpixels.
 
@@ -246,7 +246,7 @@ class Explainer():
             raise ValueError("labels and top_labels cannot both be specified.")
 
         if image.superpixels is None:
-            self.segment_image(image, num_samples)
+            self.segment_image(image)
         if image.masked_image is None: # What if mask_value changes?
             self.mask_image(image, mask_value)
 
@@ -282,19 +282,17 @@ class Explainer():
             superpixel_weights.sort(key = lambda tup: tup[1])
             LLR_pred = LLR_model.predict( origin_image_superpixels.reshape(1, -1) )
             intercept = LLR_model.intercept_
-            
-            #print some results 
-            print(f"Class stats: {classes[labels[l]]}\nIntercept:{intercept} R^2:{r2_score} Prediction on ori. image {LLR_pred}")
-            
+       
             #get num_superpixels amount superpixel_ids
             display_superpixels = [superpixel_weights[i][0] for i in range(num_superpixels)]
             #create label mask area from best_superpixels
             for pixel in display_superpixels:
                 label_masks[l][image.superpixels == pixel] = mask_int
             
-            #display image
-            self.display_image_explanation(image, label_masks[l])
-            #how to get coefficients
+            #display image and results
+            if display:
+                self.display_image_explanation(image, label_masks[l])
+                print(f"Class stats: {classes[labels[l]]}\nIntercept:{intercept} R^2:{r2_score} Prediction on ori. image {LLR_pred}")
         
         image.label_masks = label_masks
            
@@ -315,6 +313,17 @@ class Explainer():
         
         
     def get_coco_data_and_binary_masks(self, coco_data, coco_annotations, coco_target, category):
+        
+        """
+        Inputs:
+            coco_data: path to coco image directory.
+            coco_annotations: path to coco image annotations (json file).
+            coco_target: path to extracted category of coco images
+            category: string specifying the category. In our case cat or dog.
+        Outputs:
+            masks_dict: binary mask dictionary. {key:value} --> {img_filename:binary_mask}.
+                        binary_mask is a numpy array.
+        """
     
         coco = COCO(coco_annotations)
         filter_classes = [category] 
@@ -350,6 +359,14 @@ class Explainer():
             masks_dict[dst_file_name] = final_mask
         
         return masks_dict
+    
+    
+    def coco_evaluation_score(self, LIME_binary_mask, COCO_binary_mask):
+        seg_size = len(np.where(LIME_binary_mask == 1)[0])  # vores segment
+        intersect_size = len(np.where((LIME_binary_mask == 1) & (COCO_binary_mask == 1))[0])  # sammenlign segment med coco
+        coverage = intersect_size/seg_size
+        return seg_size, coverage
+
         
 ### SEGMENTATION ###
 class SegmentationMethod():
