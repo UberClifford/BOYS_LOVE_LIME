@@ -1,5 +1,6 @@
 channels:
   - pytorch
+  - conda-forge
 dependencies:
   - python
   - numpy
@@ -13,3 +14,4 @@ dependencies:
   - scikit-image
   - tqdm
   - requests
+  - pycocotools
