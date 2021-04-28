@@ -365,7 +365,7 @@ class Explainer():
         seg_size = len(np.where(LIME_binary_mask == 1)[0])  # vores segment
         intersect_size = len(np.where((LIME_binary_mask == 1) & (COCO_binary_mask == 1))[0])  # sammenlign segment med coco
         coverage = intersect_size/seg_size
-        return seg_size, coverage
+        return coverage
 
         
 ### SEGMENTATION ###
