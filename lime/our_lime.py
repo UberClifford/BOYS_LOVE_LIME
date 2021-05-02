@@ -359,15 +359,23 @@ class Explainer():
             masks_dict[dst_file_name] = final_mask
         
         return masks_dict
-    
-    
+
+
     def coco_evaluation_score(self, LIME_binary_mask, COCO_binary_mask):
         seg_size = len(np.where(LIME_binary_mask == 1)[0])  # vores segment
         intersect_size = len(np.where((LIME_binary_mask == 1) & (COCO_binary_mask == 1))[0])  # sammenlign segment med coco
         coverage = intersect_size/seg_size
         return coverage
 
-        
+
+    def coco_evaluation_score_iou(self, LIME_binary_mask, COCO_binary_mask):
+        intersection = np.logical_and(LIME_binary_mask, COCO_binary_mask)
+        union = np.logical_or(LIME_binary_mask, COCO_binary_mask)
+        intersection_over_union = np.sum(intersection) / np.sum(union)
+        return intersection_over_union
+
+
+
 ### SEGMENTATION ###
 class SegmentationMethod():
 
